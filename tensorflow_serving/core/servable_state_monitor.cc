@@ -18,9 +18,16 @@ limitations under the License.
 namespace tensorflow {
 namespace serving {
 
+ServableStateMonitor::ServableStateMonitor(const Options& options,
+                                           EventBus<ServableState>* bus)
+    : options_(options),
+      bus_subscription_(bus->Subscribe(
+          [this](const EventBus<ServableState>::EventAndTime& state_and_time) {
+            this->HandleEvent(state_and_time);
+          })) {}
+
 ServableStateMonitor::ServableStateMonitor(EventBus<ServableState>* bus)
-    : bus_subscription_(bus->Subscribe(
-          [this](const ServableState& state) { this->HandleEvent(state); })) {}
+    : ServableStateMonitor(Options(), bus) {}
 
 optional<ServableState> ServableStateMonitor::GetState(
     const ServableId& servable_id) const {
@@ -53,9 +60,23 @@ ServableStateMonitor::ServableMap ServableStateMonitor::GetAllServableStates()
   return states_;
 }
 
-void ServableStateMonitor::HandleEvent(const ServableState& state) {
+ServableStateMonitor::BoundedLog ServableStateMonitor::GetBoundedLog() const {
   mutex_lock l(mu_);
+  return log_;
+}
+
+void ServableStateMonitor::HandleEvent(
+    const EventBus<ServableState>::EventAndTime& state_and_time) {
+  mutex_lock l(mu_);
+  const ServableState& state = state_and_time.event;
   states_[state.id.name][state.id.version] = state;
+  if (options_.max_count_log_events == 0) {
+    return;
+  }
+  while (log_.size() >= options_.max_count_log_events) {
+    log_.pop_front();
+  }
+  log_.emplace_back(state_and_time.event_time_micros, state);
 }
 
 }  // namespace serving

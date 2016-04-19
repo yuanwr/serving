@@ -13,17 +13,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#include "tensorflow_serving/core/test_util/dynamic_manager_test_util.h"
+#include "tensorflow_serving/util/inline_executor.h"
+
+#include <gtest/gtest.h>
 
 namespace tensorflow {
 namespace serving {
-namespace test_util {
+namespace {
 
-DynamicManagerTestAccess::DynamicManagerTestAccess(DynamicManager* manager)
-    : manager_(manager) {}
+TEST(InlineExecutorTest, Executes) {
+  InlineExecutor inline_executor;
 
-void DynamicManagerTestAccess::RunManageState() { manager_->ManageState(); }
+  int total_calls = 0;
+  inline_executor.Schedule([&]() { ++total_calls; });
+  EXPECT_EQ(1, total_calls);
+}
 
-}  // namespace test_util
+}  // namespace
 }  // namespace serving
 }  // namespace tensorflow

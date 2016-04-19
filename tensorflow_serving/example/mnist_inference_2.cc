@@ -31,25 +31,24 @@ limitations under the License.
 #include <string>
 #include <vector>
 
-#include "grpc/include/grpc++/completion_queue.h"
-#include "grpc/include/grpc++/security/server_credentials.h"
-#include "grpc/include/grpc++/server.h"
-#include "grpc/include/grpc++/server_builder.h"
-#include "grpc/include/grpc++/server_context.h"
-#include "grpc/include/grpc++/support/async_unary_call.h"
-#include "grpc/include/grpc++/support/status.h"
-#include "grpc/include/grpc++/support/status_code_enum.h"
-#include "grpc/include/grpc/grpc.h"
-#include "grpc/include/grpc/support/log.h"
+#include "grpc++/completion_queue.h"
+#include "grpc++/security/server_credentials.h"
+#include "grpc++/server.h"
+#include "grpc++/server_builder.h"
+#include "grpc++/server_context.h"
+#include "grpc++/support/async_unary_call.h"
+#include "grpc++/support/status.h"
+#include "grpc++/support/status_code_enum.h"
+#include "grpc/grpc.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_types.h"
 #include "tensorflow/core/framework/types.pb.h"
-#include "tensorflow/core/lib/core/command_line_flags.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/lib/strings/strcat.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/init_main.h"
 #include "tensorflow/core/platform/types.h"
+#include "tensorflow/core/util/command_line_flags.h"
 #include "tensorflow_serving/batching/batch_scheduler.h"
 #include "tensorflow_serving/batching/batch_scheduler_retrier.h"
 #include "tensorflow_serving/batching/streaming_batch_scheduler.h"
@@ -79,8 +78,6 @@ using tensorflow::string;
 using tensorflow::Tensor;
 using tensorflow::serving::ClassificationSignature;
 using tensorflow::serving::UniquePtrWithDeps;
-
-TF_DEFINE_int32(port, 0, "Port server listening on.");
 
 namespace {
 const int kImageSize = 28;
@@ -398,9 +395,11 @@ void RunServer(const int port, const string& servable_name,
 
 int main(int argc, char** argv) {
   // Parse command-line options.
-  tensorflow::Status s = tensorflow::ParseCommandLineFlags(&argc, argv);
-  if (!s.ok()) {
-    LOG(FATAL) << "Error parsing command line flags: " << s.ToString();
+  tensorflow::int32 port = 0;
+  const bool parse_result =
+      tensorflow::ParseFlags(&argc, argv, {tensorflow::Flag("port", &port)});
+  if (!parse_result) {
+    LOG(FATAL) << "Error parsing command line flags.";
   }
   if (argc != 2) {
     LOG(FATAL) << "Usage: mnist_inference_2 --port=9000 /path/to/exports";
@@ -427,7 +426,7 @@ int main(int argc, char** argv) {
   } while (ready_ids.empty());
 
   // Run the service.
-  RunServer(FLAGS_port, ready_ids[0].name, std::move(manager));
+  RunServer(port, ready_ids[0].name, std::move(manager));
 
   return 0;
 }

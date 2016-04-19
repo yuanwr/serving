@@ -45,9 +45,8 @@ namespace {
 class SessionBundleSourceAdapterTest : public ::testing::Test {
  protected:
   SessionBundleSourceAdapterTest()
-      : export_dir_(
-            test_util::TestSrcDirPath("tensorflow_serving/session_bundle/"
-                                      "example/half_plus_two/00000123")) {}
+      : export_dir_(test_util::TestSrcDirPath(
+            "session_bundle/example/half_plus_two/00000123")) {}
 
   // Test data path, to be initialized to point at an export of half-plus-two.
   const string export_dir_;
@@ -85,7 +84,7 @@ class SessionBundleSourceAdapterTest : public ::testing::Test {
     TF_ASSERT_OK(loader_data.status());
     std::unique_ptr<Loader> loader = loader_data.ConsumeDataOrDie();
 
-    TF_ASSERT_OK(loader->Load());
+    TF_ASSERT_OK(loader->Load(ResourceAllocation()));
 
     const SessionBundle* bundle = loader->servable().get<SessionBundle>();
     TestSingleRequest(bundle);

@@ -3,6 +3,11 @@ local_repository(
   path = __workspace_dir__ + "/tensorflow",
 )
 
+local_repository(
+  name = "inception_model",
+  path = __workspace_dir__ + "/tf_models/inception",
+)
+
 load('//tensorflow/tensorflow:workspace.bzl', 'tf_workspace')
 tf_workspace("tensorflow/", "@tf")
 
@@ -18,11 +23,6 @@ git_repository(
     commit = "436432d849b83ab90f18773e4ae1c7a8f148f48d",
     init_submodules = True,
     remote = "https://github.com/mdsteele/boringssl-bazel.git",
-)
-
-bind(
-    name = "protobuf_clib",
-    actual = "@tf//google/protobuf:protobuf",
 )
 
 bind(
