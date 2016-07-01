@@ -16,8 +16,14 @@ limitations under the License.
 #ifndef TENSORFLOW_SERVING_BATCHING_SHARED_BATCH_SCHEDULER_H_
 #define TENSORFLOW_SERVING_BATCHING_SHARED_BATCH_SCHEDULER_H_
 
+#include <stddef.h>
 #include <deque>
+#include <functional>
 #include <list>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/status.h"
@@ -68,17 +74,20 @@ namespace serving {
 // timeout parameters, which govern when a batch is eligible to be processed.
 //
 // Each queue is independently configured with a maximum size (in terms of the
-// maximum number of batches worth of enqueued tasks). It is recommended that
-// the queue sizes be configured such that the sum of the sizes of the active
-// queues roughly equal the number of batch threads. (The idea is that if all
-// threads become available at roughly the same time, there will be enough
-// enqueued work for them to take on, but no more.)
+// maximum number of batches worth of enqueued tasks). For online serving, it is
+// recommended that the queue sizes be configured such that the sum of the sizes
+// of the active queues roughly equal the number of batch threads. (The idea is
+// that if all threads become available at roughly the same time, there will be
+// enough enqueued work for them to take on, but no more.)
 //
 // If queue sizes are configured in the manner suggested above, the maximum time
 // a task can spend in a queue before being placed in a batch and assigned to a
 // thread for processing, is the greater of:
 //  - the maximum time to process one batch of tasks from any active queue
 //  - the configured timeout parameter for the task's queue (which can be 0)
+//
+// For bulk processing jobs and throughput-oriented benchmarks, you may want to
+// set the maximum queue size to a large value.
 //
 // TODO(b/26539183): Support queue servicing policies other than round-robin.
 // E.g. let each queue specify a "share" (an int >= 1), so e.g. with queues A
@@ -116,13 +125,13 @@ class SharedBatchScheduler
   // The returned queue's destructor blocks until all tasks submitted to it have
   // been processed.
   struct QueueOptions {
-    // The maximum, and ideal, size of each batch.
+    // The maximum size of each batch.
     //
     // The scheduler may form batches of any size between 1 and this number
     // (inclusive). If there is a need to quantize the batch sizes, i.e. only
     // submit batches whose size is in a small set of allowed sizes, that can be
     // done by adding padding in the process-batch callback.
-    int max_batch_size = 32;
+    int max_batch_size = 1000;
 
     // If a task has been enqueued for this amount of time (in microseconds),
     // and a thread is available, the scheduler will immediately form a batch
@@ -133,12 +142,18 @@ class SharedBatchScheduler
     // stuck in the queue indefinitely waiting for enough tasks to arrive to
     // make a full batch. (The latency bound is given in the class documentation
     // above.)
-    int64 batch_timeout_micros = 10 * 1000 /* 10 milliseconds */;
+    //
+    // The goal is to smooth out batch sizes under low request rates, and thus
+    // avoid latency spikes. The default value of 1 millisecond was determined
+    // via benchmarking. You may need to adjust it to suit your workload and
+    // environment.
+    int64 batch_timeout_micros = 1 * 1000 /* 1 millisecond */;
 
-    // The maximum length of the queue, in terms of the number of batches. (A
-    // batch that has been scheduled on a thread is considered to have been
-    // removed from the queue.) See the class documentation above for guidelines
-    // on how to tune this parameter.
+    // The maximum allowable number of enqueued (accepted by Schedule() but
+    // not yet being processed on a batch thread) tasks in terms of batches.
+    // If this limit is reached, Schedule() will return an UNAVAILABLE error.
+    // See the class documentation above for guidelines on how to tune this
+    // parameter.
     int max_enqueued_batches = 1;
   };
   Status AddQueue(const QueueOptions& options,

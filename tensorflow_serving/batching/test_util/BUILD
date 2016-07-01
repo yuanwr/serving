@@ -29,9 +29,8 @@ cc_library(
     hdrs = ["puppet_batch_scheduler.h"],
     visibility = ["//visibility:private"],
     deps = [
-        "@tf//tensorflow/core:framework",
-        "@tf//tensorflow/core:tensorflow",
         "//tensorflow_serving/batching:batch_scheduler",
+        "@org_tensorflow//tensorflow/core:tensorflow",
     ],
 )
 
@@ -43,5 +42,7 @@ cc_test(
     deps = [
         ":puppet_batch_scheduler",
         "//tensorflow_serving/core/test_util:test_main",
+        "@org_tensorflow//tensorflow/core:lib",
+        "@org_tensorflow//tensorflow/core:test",
     ],
 )

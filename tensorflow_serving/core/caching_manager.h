@@ -27,6 +27,10 @@ limitations under the License.
 namespace tensorflow {
 namespace serving {
 
+namespace test_util {
+class CachingManagerTestAccess;
+}  // namespace test_util
+
 // A manager that manages and loads servables on-demand. Upon receiving the
 // request for a servable name and optional version, the manager checks if it
 // already has the requested servable loaded. If not, it initiates the load
@@ -75,11 +79,14 @@ class CachingManager : public Manager {
     virtual ~LoaderFactory() = default;
 
     // Creates servable data consisting of the loader corresponding to the
-    // request.
+    // servable-id.
     virtual Status CreateLoader(
-        const ServableRequest& request,
+        const ServableId& servable_id,
         std::unique_ptr<ServableData<std::unique_ptr<Loader>>>*
             loader_data) = 0;
+
+    // Returns the latest version corresponding to the servable name.
+    virtual int64 GetLatestVersion(const string& servable_name) const = 0;
   };
 
   static Status Create(Options options,
@@ -94,28 +101,53 @@ class CachingManager : public Manager {
   std::vector<ServableId> ListAvailableServableIds() const override;
 
  private:
+  friend class test_util::CachingManagerTestAccess;
+
   CachingManager(std::unique_ptr<LoaderFactory> loader_factory,
                  std::unique_ptr<BasicManager> basic_manager);
 
   // Returns the untyped handle for the servable request.
   //
   // Semantics related to a ServableRequest for "latest":
-  // 1. If the manager does not have any version of the requested servable
-  // loaded, it forwards the "latest" request to the loader-factory, which emits
-  // its notion of the "latest" version. This is then managed and loaded by the
-  // manager.
-  // 2. If the manager already has one or more versions of the requested
-  // servable name, it will return the latest among those versions (regardless
-  // of whether the loader-factory may know of a later version).
-  //
-  // TODO(b/25449742): Always return latest as determined by the loader factory.
+  // The manager forwards the "latest" request to the loader-factory, which
+  // emits its notion of the "latest" version. This is then managed and loaded
+  // by the manager, if not already available, and a handle to it is returned.
   Status GetUntypedServableHandle(
       const ServableRequest& request,
       std::unique_ptr<UntypedServableHandle>* handle) override;
 
+  // Returns the untyped handle for a servable-id.
+  Status GetUntypedServableHandleForId(
+      const ServableId& servable_id,
+      std::unique_ptr<UntypedServableHandle>* handle);
+
+  // Load the servable corresponding to the servable-id. For multiple concurrent
+  // requests for the same servable-id, enforces that exactly one thread
+  // performs the load operation using the wrapped basic-manager. All other
+  // requests block until the load completes and then trivially succeed.
+  Status LoadServable(const ServableId& servable_id)
+      LOCKS_EXCLUDED(load_mutex_map_mu_);
+
+  // Returns the size of the load_mutex_map_.
+  int64 GetLoadMutexMapSize() const LOCKS_EXCLUDED(load_mutex_map_mu_);
+
+  // Erases the entry from the map corresponding to the servable-id if there is
+  // only one remaining reference to the mutex.
+  void MaybeEraseLoadMutexMapEntry(const ServableId& servable_id);
+
   std::unique_ptr<LoaderFactory> loader_factory_;
 
   std::unique_ptr<BasicManager> basic_manager_;
+
+  // Used to protect access to the load_mutex_map_.
+  mutable mutex load_mutex_map_mu_;
+
+  // Map of servable-id to a mutex, which is required to synchronize calls to
+  // load the servable using the wrapped basic-manager. The value in the map is
+  // a shared_ptr to allow for reference counting and consequent garbage
+  // collection.
+  std::map<ServableId, std::shared_ptr<mutex>> load_mutex_map_
+      GUARDED_BY(load_mutex_map_mu_);
 
   TF_DISALLOW_COPY_AND_ASSIGN(CachingManager);
 };

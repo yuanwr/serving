@@ -51,7 +51,6 @@ limitations under the License.
 #include "tensorflow/core/util/command_line_flags.h"
 #include "tensorflow_serving/batching/basic_batch_scheduler.h"
 #include "tensorflow_serving/batching/batch_scheduler.h"
-#include "tensorflow_serving/batching/batch_scheduler_retrier.h"
 #include "tensorflow_serving/core/manager.h"
 #include "tensorflow_serving/core/servable_handle.h"
 #include "tensorflow_serving/core/servable_id.h"
@@ -155,7 +154,8 @@ class MnistServiceImpl final {
   std::unique_ptr<tensorflow::serving::Manager> manager_;
   // A scheduler for batching multiple request calls into single calls to
   // Session->Run().
-  std::unique_ptr<tensorflow::serving::BatchScheduler<Task>> batch_scheduler_;
+  std::unique_ptr<tensorflow::serving::BasicBatchScheduler<Task>>
+      batch_scheduler_;
 };
 
 // Take in the "service" instance (in this case representing an asynchronous
@@ -215,10 +215,12 @@ MnistServiceImpl::MnistServiceImpl(
   // specific graph structure and usage.
   tensorflow::serving::BasicBatchScheduler<Task>::Options scheduler_options;
   scheduler_options.thread_pool_name = "mnist_service_batch_threads";
-  tensorflow::serving::BatchSchedulerRetrier<Task>::Options retry_options;
-  // Retain the default retry options.
-  TF_CHECK_OK(tensorflow::serving::CreateRetryingBasicBatchScheduler<Task>(
-      scheduler_options, retry_options,
+  // Use a very large queue, to avoid rejecting requests. (Note: a production
+  // server with load balancing may want to use the default, much smaller,
+  // value.)
+  scheduler_options.max_enqueued_batches = 1000;
+  TF_CHECK_OK(tensorflow::serving::BasicBatchScheduler<Task>::Create(
+      scheduler_options,
       [this](std::unique_ptr<tensorflow::serving::Batch<Task>> batch) {
         this->DoClassifyInBatch(std::move(batch));
       },
@@ -302,7 +304,7 @@ void MnistServiceImpl::DoClassifyInBatch(
   }
 
   // Transform protobuf input to inference input tensor.
-  // See minist_model.py for details.
+  // See mnist_model.py for details.
   // WARNING(break-tutorial-inline-code): The following code snippet is
   // in-lined in tutorials, please update tutorial documents accordingly
   // whenever code changes.
@@ -342,7 +344,7 @@ void MnistServiceImpl::DoClassifyInBatch(
   }
 
   // Transform inference output tensor to protobuf output.
-  // See minist_model.py for details.
+  // See mnist_model.py for details.
   const auto& scores_mat = scores.matrix<float>();
   for (int i = 0; i < batch_size; ++i) {
     auto calldata = batch->mutable_task(i)->calldata;

@@ -25,11 +25,11 @@ cc_library(
     srcs = ["test_util.cc"],
     hdrs = ["test_util.h"],
     deps = [
-        "@tf//google/protobuf:protobuf",
-        "@tf//tensorflow/core",
-        "@tf//tensorflow/core:lib",
-        "@tf//tensorflow/core:test",
         "//external:gtest",
+        "@org_tensorflow//tensorflow/core",
+        "@org_tensorflow//tensorflow/core:lib",
+        "@org_tensorflow//tensorflow/core:test",
+        "@protobuf//:protobuf",
     ],
 )
 
@@ -38,8 +38,20 @@ cc_library(
     testonly = 1,
     srcs = ["fake_clock_env.cc"],
     hdrs = ["fake_clock_env.h"],
+    visibility = [
+        "//visibility:public",
+    ],
     deps = [
-        "@tf//tensorflow/core:lib",
-        "@tf//tensorflow/core:tensorflow",
+        "@org_tensorflow//tensorflow/core:lib",
+        "@org_tensorflow//tensorflow/core:tensorflow",
+    ],
+)
+
+py_library(
+    name = "test_util_py",
+    testonly = 1,
+    srcs = ["test_util.py"],
+    deps = [
+        "@org_tensorflow//tensorflow:tensorflow_py",
     ],
 )

@@ -98,7 +98,11 @@ by the hardware should be used; it will likely be model-dependent.
 
 * `batch_timeout_micros`: A way to bound request latency. The scheduler will
 avoid delaying a task too long by processing an underfull batch, if needed.
-(See `basic_batch_scheduler.h` for the exact latency contract.)
+(See `basic_batch_scheduler.h` for the exact latency contract.) A value slightly
+above zero, e.g. 1 millisecond, tends to smooth out batch sizes when the request
+rate is low, thus keeping tail latency low while still maintaining high
+throughput. The best value to use is of course a function of your workload and
+system.
 
 * `num_batch_threads`: The number of threads used to process batches.
 
@@ -111,16 +115,6 @@ benchmarks, you may want to set it much higher.
 (If you need to limit the possible batch sizes, as in `BatchingSession`'s
 `allowed_batch_sizes` parameter, you can have your callback code pad the
 batches.)
-
-### `BatchSchedulerRetrier`
-
-`BatchScheduler::Schedule()` will reject a task if the scheduler currently has
-no capacity to process or enqueue it. If you want to automatically retry tasks
-that are rejected for that reason you can layer a `BatchSchedulerRetrier` on
-top of the batch scheduler. Note, however, that rejecting tasks may be the
-right behavior for servers that would rather reject requests than incur
-excessive latency, e.g. environments that (re-)route rejected requests to other
-server instances.
 
 ## Servers with Multiple Models, Model Versions or Subtasks
 
@@ -167,6 +161,12 @@ callback the batch scheduler calls. To allow the callback to perform non-
 batched work on tasks before a batch is fully formed, you can use
 `StreamingBatchScheduler`. It is designed for servers that control latency very
 precisely, and need fine control over each stage of the pipeline.
+
+`StreamingBatchScheduler` will reject a task if the scheduler currently has
+no capacity to process it. If you want to automatically retry tasks that are
+rejected for that reason you can layer a `BatchSchedulerRetrier` on top of the
+batch scheduler. There is a convenience function for creating a streaming
+scheduler coupled with a retrier: `CreateRetryingStreamingBatchScheduler()'.
 
 When splitting model inference logic into multiple distinct phases to optimize
 latency or utilization, keep in mind that for a given request, every phase

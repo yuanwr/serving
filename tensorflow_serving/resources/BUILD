@@ -31,7 +31,7 @@ serving_proto_library(
     srcs = ["resources.proto"],
     cc_api_version = 2,
     visibility = ["//visibility:public"],
-    deps = ["@tf//google/protobuf:cc_wkt_protos"],
+    deps = ["@protobuf//:cc_wkt_protos"],
 )
 
 cc_library(
@@ -48,8 +48,8 @@ cc_library(
     srcs = ["resource_util.cc"],
     hdrs = ["resource_util.h"],
     deps = [
-        "@tf//tensorflow/core:lib",
         ":resources_proto",
+        "@org_tensorflow//tensorflow/core:lib",
     ],
 )
 
@@ -69,10 +69,10 @@ cc_library(
     srcs = ["resource_tracker.cc"],
     hdrs = ["resource_tracker.h"],
     deps = [
-        "@tf//tensorflow/core:lib",
         ":resource_util",
         ":resources_proto",
         "//tensorflow_serving/core:loader",
+        "@org_tensorflow//tensorflow/core:lib",
     ],
 )
 

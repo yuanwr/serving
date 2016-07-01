@@ -17,7 +17,10 @@ limitations under the License.
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include "tensorflow/core/lib/core/error_codes.pb.h"
+#include "tensorflow/core/lib/core/notification.h"
 #include "tensorflow/core/lib/core/status_test_util.h"
+#include "tensorflow/core/platform/macros.h"
 #include "tensorflow_serving/test_util/fake_clock_env.h"
 
 using ::testing::ElementsAre;
@@ -563,7 +566,8 @@ TEST(SharedBatchSchedulerTest, QueueDestructorBlocksUntilAllTasksProcessed) {
     EXPECT_EQ(kMaxEnqueuedBatches, num_enqueued_batches);
     EXPECT_EQ(error::UNAVAILABLE, ScheduleTask(10, queue.get()).code());
 
-    // Destroy the queue. The destructor should block until the queue is empty.
+    // Destroy the queue. The destructor should block until all tasks have been
+    // processed.
     Notification destroy_queue_thread_started, queue_destroyed;
     std::unique_ptr<Thread> destroy_queue_thread(Env::Default()->StartThread(
         {}, "DestroyQueueThread",

@@ -1,7 +1,9 @@
 # Description: Tensorflow Serving session_bundle example.
 
 package(
-    default_visibility = ["//tensorflow_serving:internal"],
+    default_visibility = [
+        "//tensorflow_serving:internal",
+    ],
 )
 
 licenses(["notice"])  # Apache 2.0
@@ -26,8 +28,8 @@ py_binary(
         "export_half_plus_two.py",
     ],
     deps = [
-        "@tf//tensorflow:tensorflow_py",
         "//tensorflow_serving/session_bundle:exporter",
+        "@org_tensorflow//tensorflow:tensorflow_py",
     ],
 )
 
@@ -44,4 +46,5 @@ genrule(
     tools = [
         ":export_half_plus_two",
     ],
+    visibility = ["//visibility:public"],
 )
